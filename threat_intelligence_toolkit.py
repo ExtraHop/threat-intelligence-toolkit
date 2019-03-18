@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# COPYRIGHT 2018 BY EXTRAHOP NETWORKS, INC.
+# COPYRIGHT 2019 BY EXTRAHOP NETWORKS, INC.
 # 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
@@ -18,11 +18,12 @@
 #
 # Note: This script solely serves as example code and is made available without any support or warranty.
 #
-# Version 1.3.1
+# Version 1.3.2
 
 import cabby
 import requests
 import urllib3
+import validators
 import ipaddress
 import datetime
 import pytz
@@ -46,7 +47,7 @@ def parse_command_line_args():
 	argparser.add_argument('-o', '--output-dir', action='store', dest='output_dir', help='Existing directory to output tgz containing stix files', required=True, metavar='OUTPUT_DIRECTORY')
 	argparser.add_argument('-tc', '--threatcollection-name', action='store', dest='threat_collection_name', help='Name for the ExtraHop threat collection', required=True)
 	# options below are for specifying a TAXII server to pull from
-	argparser.add_argument('--taxii-server', action='store', dest='taxii_server', default=[], nargs=3, help='TAXII server to poll TI info from, format: host, discovery_path, use_https', metavar=('TAXII_HOST', 'DISCOVERY_PATH', 'USE_HTTPS'))
+	argparser.add_argument('--taxii-server', action='store', dest='taxii_server', default=[], nargs=3, help='TAXII server to poll TI info from, format: host discovery_path use_https', metavar=('TAXII_HOST', 'DISCOVERY_PATH', 'USE_HTTPS'))
 	argparser.add_argument('--taxii-collections', action='store', dest='taxii_collections', default=[], nargs='*', help='One or more desired TAXII collection names to poll', metavar='TAXII_COLLECTION_NAME')
 	argparser.add_argument('--days', action='store', dest='days_to_poll', default=30, type=int, help='Number of days to poll from the past')
 	argparser.add_argument('--basic-user', action='store', dest='basic_user', help='Username, used in basic auth', metavar='BASIC_USERNAME')
@@ -78,14 +79,6 @@ def strip_non_alphanum(input_str):
 # convert string to boolean and return True when unsure
 def str_to_bool(input_str):
 	return input_str.lower() not in ['false', 'f', '0', 'n', 'no']
-
-# basic check to detect if a string is a url
-def is_url(possible_url):
-	parsed_url = urllib3.util.parse_url(possible_url)
-	if parsed_url.scheme and parsed_url.host:
-		return True
-	else:
-		return False
 
 # send a PUT request to an EDA or ECA threatcollections/{id} endpoint
 def threatcollection_api_request(eh_host, eh_apikey, eh_verify_cert, threatcollection_name, file_name, file_path, verbose):
@@ -141,7 +134,7 @@ def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp
 	reporttime = datetime.datetime.utcnow().strftime('%m/%d/%Y %H:%M:%S %Z')
 
 	# download or open file
-	if is_url(input_file):
+	if validators.url(input_file):
 		res = requests.get(input_file)
 		items = res.text.split(delimiter)
 	else:
@@ -158,8 +151,8 @@ def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp
 	for item in items:
 		item = item.strip()
 
-		# basic filtering of comment items
-		if item.startswith(('#', '//', '--')):
+		# basic filtering of empty items and comments
+		if not item or item.startswith(('#', '//', '--')):
 			continue
 
 		if list_type == 'ip':
@@ -189,6 +182,10 @@ def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp
 			indicator_title = "IP: {}"
 			indicator_description = "IP {} reported from {}"
 		elif list_type == 'domain':
+			# validate domain
+			if not validators.domain(item):
+				logging.warning("Invalid domain: {} - skipping".format(item))
+				continue
 			indicator_obj = DomainName()
 			indicator_obj.value = item
 			indicator_type = "Domain Watchlist"
@@ -196,6 +193,10 @@ def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp
 			indicator_title = "Domain: {}"
 			indicator_description = "Domain {} reported from {}"
 		elif list_type == 'url':
+			# validate url
+			if not validators.url(item):
+				logging.warning("Invalid url: {} - skipping".format(item))
+				continue
 			indicator_obj = URI()
 			indicator_obj.value = item
 			indicator_obj.type_ =  URI.TYPE_URL
