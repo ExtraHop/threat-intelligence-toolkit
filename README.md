@@ -15,6 +15,7 @@ Specify an output directory, threat collection name, ECA/EDA details, and other 
 ## Installation
 - pip install cabby==0.1.20
 - pip install stix==1.2.0.6
+- pip install validators==0.12.4
 
 ## Example Running Commands
 You will need to update the example output paths, collection names, IP addresses, hostnames, and API keys below to match your environment.
