@@ -18,7 +18,7 @@
 #
 # Note: This script solely serves as example code and is made available without any support or warranty.
 #
-# Version 1.3.2
+# Version 1.3.3
 
 import cabby
 import requests
@@ -36,6 +36,7 @@ import logging
 from cybox.objects.uri_object import URI
 from cybox.objects.domain_name_object import DomainName
 from cybox.objects.address_object import Address
+from cybox.utils.caches import cache_clear
 from stix.core import STIXPackage, STIXHeader
 from stix.indicator.indicator import Indicator
 
@@ -116,24 +117,17 @@ def threatcollection_api_request(eh_host, eh_apikey, eh_verify_cert, threatcolle
 		raise ValueError("Non-200 status code from ExtraHop API request. Status code: {}, URL: {}, Response: {}".format(r.status_code, url, r.text))
 	return
 
-# generate a stix from from a flat file or URL to a flat file
+# generate stix files from a flat file or URL to a flat file
 def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp_dir, verbose):
+	# observable limit per generated stix file
+	OBSERVABLES_PER_STIX_FILE = 3000
 
 	if verbose:
 		logging.info("=====================")
 		logging.info("== GENERATING STIX ==")
 		logging.info("=====================")
 	
-	# create the STIX Package
-	package = STIXPackage()
-
-	# create the STIX Header and add a description.
-	header = STIXHeader()
-	package.stix_header = header
-
-	reporttime = datetime.datetime.utcnow().strftime('%m/%d/%Y %H:%M:%S %Z')
-
-	# download or open file
+	# download or open input file
 	if validators.url(input_file):
 		res = requests.get(input_file)
 		items = res.text.split(delimiter)
@@ -147,87 +141,105 @@ def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp
 				items = f.read().split(delimiter)
 	logging.info("Successfully parsed input file at {}".format(input_file))
 
-	# create indicator for each item
-	for item in items:
-		item = item.strip()
+	# slice input into batches
+	for batch_num, index in enumerate(range(0, len(items), OBSERVABLES_PER_STIX_FILE), 1):
+		# slice handles out of bounds indices gracefully
+		batch_items = items[index:index + OBSERVABLES_PER_STIX_FILE]
 
-		# basic filtering of empty items and comments
-		if not item or item.startswith(('#', '//', '--')):
-			continue
+		# create the STIX Package
+		package = STIXPackage()
 
-		if list_type == 'ip':
-			indicator_obj = Address()
-			# attempt to parse as an ip address
-			try:
-				parsed_ip = ipaddress.ip_address(item)
-				if parsed_ip.version == 4:
-					indicator_obj.category = Address.CAT_IPV4
-				elif parsed_ip.version == 6:
-					indicator_obj.category = Address.CAT_IPV6
-				else:
-					logging.warning("Unknown IP Address version type: {} - skipping".format(parsed_ip.version))
-					continue
-			except ValueError:
-				# if ip address parsing fails then attempt to parse as an ip network
+		# create the STIX Header and add a description
+		header = STIXHeader()
+		package.stix_header = header
+
+		reporttime = datetime.datetime.utcnow().strftime('%m/%d/%Y %H:%M:%S %Z')
+
+		# create indicator for each item in the batch
+		for item in batch_items:
+			item = item.strip()
+
+			# basic filtering of empty items and comments
+			if not item or item.startswith(('#', '//', '--')):
+				continue
+
+			if list_type == 'ip':
+				indicator_obj = Address()
+				# attempt to parse as an ip address
 				try:
-					parsed_ip = ipaddress.ip_network(item, strict=False)
-					indicator_obj.category = Address.CAT_CIDR
+					parsed_ip = ipaddress.ip_address(item)
+					if parsed_ip.version == 4:
+						indicator_obj.category = Address.CAT_IPV4
+					elif parsed_ip.version == 6:
+						indicator_obj.category = Address.CAT_IPV6
+					else:
+						logging.warning("Unknown IP Address version type: {} - skipping".format(parsed_ip.version))
+						continue
 				except ValueError:
-					logging.warning("IP Address {} is neither an IPv4, IPv6, nor CIDR - skipping".format(item))
+					# if ip address parsing fails then attempt to parse as an ip network
+					try:
+						parsed_ip = ipaddress.ip_network(item, strict=False)
+						indicator_obj.category = Address.CAT_CIDR
+					except ValueError:
+						logging.warning("IP Address {} is neither an IPv4, IPv6, nor CIDR - skipping".format(item))
+						continue
+				indicator_obj.address_value = str(parsed_ip)
+				indicator_obj.condition = "Equals"
+				indicator_type = "IP Watchlist"
+				# customizable components below
+				indicator_title = "IP: {}"
+				indicator_description = "IP {} reported from {}"
+			elif list_type == 'domain':
+				# validate domain
+				if not validators.domain(item):
+					logging.warning("Invalid domain: {} - skipping".format(item))
 					continue
-			indicator_obj.address_value = str(parsed_ip)
-			indicator_obj.condition = "Equals"
-			indicator_type = "IP Watchlist"
-			# customizable components below
-			indicator_title = "IP: {}"
-			indicator_description = "IP {} reported from {}"
-		elif list_type == 'domain':
-			# validate domain
-			if not validators.domain(item):
-				logging.warning("Invalid domain: {} - skipping".format(item))
-				continue
-			indicator_obj = DomainName()
-			indicator_obj.value = item
-			indicator_type = "Domain Watchlist"
-			# customizable components below
-			indicator_title = "Domain: {}"
-			indicator_description = "Domain {} reported from {}"
-		elif list_type == 'url':
-			# validate url
-			if not validators.url(item):
-				logging.warning("Invalid url: {} - skipping".format(item))
-				continue
-			indicator_obj = URI()
-			indicator_obj.value = item
-			indicator_obj.type_ =  URI.TYPE_URL
-			indicator_obj.condition = "Equals"
-			indicator_type = "URL Watchlist"
-			# customizable components below
-			indicator_title = "URL: {}"
-			indicator_description = "URL {} reported from {}"
-		else:
-			# invalid input type
-			logging.error("invalid input type encountered")
-			raise Exception('Error: invalid input type encountered')
+				indicator_obj = DomainName()
+				indicator_obj.value = item
+				indicator_type = "Domain Watchlist"
+				# customizable components below
+				indicator_title = "Domain: {}"
+				indicator_description = "Domain {} reported from {}"
+			elif list_type == 'url':
+				# validate url
+				if not validators.url(item):
+					logging.warning("Invalid url: {} - skipping".format(item))
+					continue
+				indicator_obj = URI()
+				indicator_obj.value = item
+				indicator_obj.type_ =  URI.TYPE_URL
+				indicator_obj.condition = "Equals"
+				indicator_type = "URL Watchlist"
+				# customizable components below
+				indicator_title = "URL: {}"
+				indicator_description = "URL {} reported from {}"
+			else:
+				# invalid input type
+				logging.error("invalid input type encountered")
+				raise Exception('Error: invalid input type encountered')
+
+			# create a basic Indicator object from the item
+			indicator = Indicator()
+			indicator.title = indicator_title.format(str(item))
+			indicator.description = indicator_description.format(str(item), list_name)
+			indicator.add_indicator_type(indicator_type)
+			indicator.set_producer_identity(list_name)
+			indicator.set_produced_time(str(reporttime))
+			indicator.add_observable(indicator_obj)
+
+			# add the indicator to the stix package
+			package.add_indicator(indicator)
+
+		# save each batch in a separate stix file with the filename ending ..._part_N.stix
+		collection_filename = "{}_part_{}.stix".format(strip_non_alphanum(tc_name), batch_num)
+		with open(os.path.join(tmp_dir, collection_filename), 'wb') as f:
+			f.write(package.to_xml())
+		logging.info("Successfully created stix file {}".format(collection_filename))
+
+		# clear cybox cache to prevent an Out of Memory error
+		# https://cybox.readthedocs.io/en/stable/api/cybox/core/object.html#cybox.core.object.Object
+		cache_clear()
 			
-		# create a basic Indicator object from the item
-		indicator = Indicator()
-		indicator.title = indicator_title.format(str(item))
-		indicator.description = indicator_description.format(str(item), list_name)
-		indicator.add_indicator_type(indicator_type)
-		indicator.set_producer_identity(list_name)
-		indicator.set_produced_time(str(reporttime))
-		indicator.add_observable(indicator_obj)
-
-		# add the indicator to the stix package
-		package.add_indicator(indicator)
-
-	# create the stix file
-	collection_filename = "{}.stix".format(strip_non_alphanum(tc_name)) 
-	with open(os.path.join(tmp_dir, collection_filename), 'wb') as f:
-		f.write(package.to_xml())
-	logging.info("Successfully created stix file {}".format(collection_filename))
-	
 	return 
 
 # poll a taxii server for stix files
