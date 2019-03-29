@@ -63,6 +63,7 @@ def parse_command_line_args():
 	# option below are for uploading to eca/eda(s)
 	argparser.add_argument('--eca', action='store', dest='eca', default=[], nargs=3, help='One ECA to push threat intel collection, format: host apikey verify_cert', metavar=('HOST', 'APIKEY', 'VERIFY_CERT'))
 	argparser.add_argument('--eda', action='append', dest='edas', default=[], nargs=3, help='One or more EDAs to push threat intel collection, format: host apikey verify_cert', metavar=('HOST', 'APIKEY', 'VERIFY_CERT'))
+	argparser.add_argument('--clean-up', action='store_true', dest='clean_up', default=False, help='Remove the local threat collection .tgz file after successfully uploading, recommended when running on cron. Requires that --eca or --eda is set.')
 	# debug output
 	argparser.add_argument('-v', '--verbose', action='store_true', dest='verbose', default=False, help='Verbose mode, prints out service and collection details as well as running info')
 
@@ -379,6 +380,14 @@ def main():
 				threatcollection_api_request(eda[0], eda[1], str_to_bool(eda[2]), args.threat_collection_name, tgz_name, tgz_path, args.verbose)
 	else:
 		logging.warning("Did not upload threat collection to an ExtraHop appliance since neither an ECA/EDAs nor EDAs were provided")
+
+	# optionally delete the .tgz after upload
+	if (args.eca or args.edas) and args.clean_up:
+		try:
+			os.remove(tgz_path)
+			logging.info("Successfully cleaned up and removed the local threat collection tgz file: {}".format(tgz_name))
+		except OSError as e:
+			logging.error("Could not delete the local threat collection .tgz file: {}. Details: {}.".format(tgz_path, e.strerror))
 
 	logging.info('ExtraHop Threat Intelligence Toolkit finished running')
 
