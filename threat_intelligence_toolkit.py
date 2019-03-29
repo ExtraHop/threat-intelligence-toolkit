@@ -18,7 +18,7 @@
 #
 # Note: This script solely serves as example code and is made available without any support or warranty.
 #
-# Version 1.3.3
+# Version 1.3.4
 
 import cabby
 import requests
@@ -59,6 +59,7 @@ def parse_command_line_args():
 	argparser.add_argument('--list-type', action='store', dest='list_type', choices=['ip','domain', 'url'], help='Type of the input items in the provided list (list must all be the same type), allowed values: ip, domain, url. Ignored if --generate-stix is not set.', metavar='LIST_TYPE')
 	argparser.add_argument('--delimiter', action='store', dest='delimiter', help='Delimiter for the input list file. Ignored if --generate-stix is not set.', default='\n', metavar='INPUT_FILE')
 	argparser.add_argument('--list-name', action='store', dest='list_name', help='Name of the list or provider to be used in the created stix file. Ignored if --generate-stix is not set.', default='Threat Intel List', metavar='LIST_NAME')
+	argparser.add_argument('--validate', action='store_true', dest='validate_input', default=False, help='Validate each Domain/URL before adding to generated stix file (beta). Requires that --generate-stix is set.')
 	# option below are for uploading to eca/eda(s)
 	argparser.add_argument('--eca', action='store', dest='eca', default=[], nargs=3, help='One ECA to push threat intel collection, format: host apikey verify_cert', metavar=('HOST', 'APIKEY', 'VERIFY_CERT'))
 	argparser.add_argument('--eda', action='append', dest='edas', default=[], nargs=3, help='One or more EDAs to push threat intel collection, format: host apikey verify_cert', metavar=('HOST', 'APIKEY', 'VERIFY_CERT'))
@@ -118,7 +119,7 @@ def threatcollection_api_request(eh_host, eh_apikey, eh_verify_cert, threatcolle
 	return
 
 # generate stix files from a flat file or URL to a flat file
-def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp_dir, verbose):
+def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp_dir, validate, verbose):
 	# observable limit per generated stix file
 	OBSERVABLES_PER_STIX_FILE = 3000
 
@@ -191,7 +192,7 @@ def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp
 				indicator_description = "IP {} reported from {}"
 			elif list_type == 'domain':
 				# validate domain
-				if not validators.domain(item):
+				if validate and not validators.domain(item):
 					logging.warning("Invalid domain: {} - skipping".format(item))
 					continue
 				indicator_obj = DomainName()
@@ -202,7 +203,7 @@ def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp
 				indicator_description = "Domain {} reported from {}"
 			elif list_type == 'url':
 				# validate url
-				if not validators.url(item):
+				if validate and not validators.url(item):
 					logging.warning("Invalid url: {} - skipping".format(item))
 					continue
 				indicator_obj = URI()
@@ -345,7 +346,7 @@ def main():
 
 	# generate stix file from flat file
 	if args.generate_stix:
-		generate_stix_file(args.input_file, args.list_type, args.delimiter, args.list_name, args.threat_collection_name, tmp_dir, args.verbose)
+		generate_stix_file(args.input_file, args.list_type, args.delimiter, args.list_name, args.threat_collection_name, tmp_dir, args.validate_input, args.verbose)
 	# else poll stix collections from taxii server
 	else:
 		poll_taxii_server(args.taxii_server, args.basic_user, args.basic_pw, args.taxii_collections, args.days_to_poll, tmp_dir, args.verbose)
