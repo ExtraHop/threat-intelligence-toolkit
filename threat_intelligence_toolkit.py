@@ -18,7 +18,7 @@
 #
 # Note: This script solely serves as example code and is made available without any support or warranty.
 #
-# Version 1.3.4
+# Version 1.3.5
 
 import cabby
 import requests
@@ -352,42 +352,46 @@ def main():
 	else:
 		poll_taxii_server(args.taxii_server, args.basic_user, args.basic_pw, args.taxii_collections, args.days_to_poll, tmp_dir, args.verbose)
 
-	# create the gzipped tar file of the temporary directory
-	tgz_name = "{}.tgz".format(tmp_dir_name)
-	tgz_path = os.path.join(args.output_dir, tgz_name)
-	with tarfile.open(tgz_path, "w:gz") as tar:
-		tar.add(tmp_dir, arcname=os.path.basename(tmp_dir))
-	logging.info("Successfully created tgz file named {} in {}".format(tgz_name, args.output_dir))
+	# only proceed with packaging and uploading if there are files present
+	if os.listdir(tmp_dir):
+		# create the gzipped tar file of the temporary directory
+		tgz_name = "{}.tgz".format(tmp_dir_name)
+		tgz_path = os.path.join(args.output_dir, tgz_name)
+		with tarfile.open(tgz_path, "w:gz") as tar:
+			tar.add(tmp_dir, arcname=os.path.basename(tmp_dir))
+		logging.info("Successfully created tgz file named {} in {}".format(tgz_name, args.output_dir))
+
+		# upload the threat collection to one ECA and one or more EDAs
+		if args.eca:
+			# if an ECA is provided then at least one EDA is needed too to keep them in sync
+			if args.edas:
+				threatcollection_api_request(args.eca[0], args.eca[1], str_to_bool(args.eca[2]), args.threat_collection_name, tgz_name, tgz_path, args.verbose)
+				for eda in args.edas:
+					threatcollection_api_request(eda[0], eda[1], str_to_bool(eda[2]), args.threat_collection_name, tgz_name, tgz_path, args.verbose)
+			else:
+				logging.warning("Did not upload threat collection to ECA since no accompanying EDAs were provided")
+		# if only EDAs are provided
+		elif args.edas:
+			for eda in args.edas:
+					threatcollection_api_request(eda[0], eda[1], str_to_bool(eda[2]), args.threat_collection_name, tgz_name, tgz_path, args.verbose)
+		else:
+			logging.warning("Did not upload threat collection to an ExtraHop appliance since neither an ECA/EDAs nor EDAs were provided")
+
+		# optionally delete the .tgz after upload
+		if (args.eca or args.edas) and args.clean_up:
+			try:
+				os.remove(tgz_path)
+				logging.info("Successfully cleaned up and removed the local threat collection tgz file: {}".format(tgz_name))
+			except OSError as e:
+				logging.error("Could not delete the local threat collection .tgz file: {}. Details: {}.".format(tgz_path, e.strerror))
+	else:
+		logging.warning('There were no threat intel results to process. Note: If polling a TAXII server ensure that the collection(s) contain results')
 
 	# remove the temporary directory
 	try:
 		shutil.rmtree(tmp_dir)
 	except OSError as e:
 		logging.error("Could not delete the temporary directory: {}. Details: {}.".format(tmp_dir_name, e.strerror))
-
-	# upload the threat collection to one ECA and one or more EDAs
-	if args.eca:
-		# if an ECA is provided then at least one EDA is needed too to keep them in sync
-		if args.edas:
-			threatcollection_api_request(args.eca[0], args.eca[1], str_to_bool(args.eca[2]), args.threat_collection_name, tgz_name, tgz_path, args.verbose)
-			for eda in args.edas:
-				threatcollection_api_request(eda[0], eda[1], str_to_bool(eda[2]), args.threat_collection_name, tgz_name, tgz_path, args.verbose)
-		else:
-			logging.warning("Did not upload threat collection to ECA since no accompanying EDAs were provided")
-	# if only EDAs are provided
-	elif args.edas:
-		for eda in args.edas:
-				threatcollection_api_request(eda[0], eda[1], str_to_bool(eda[2]), args.threat_collection_name, tgz_name, tgz_path, args.verbose)
-	else:
-		logging.warning("Did not upload threat collection to an ExtraHop appliance since neither an ECA/EDAs nor EDAs were provided")
-
-	# optionally delete the .tgz after upload
-	if (args.eca or args.edas) and args.clean_up:
-		try:
-			os.remove(tgz_path)
-			logging.info("Successfully cleaned up and removed the local threat collection tgz file: {}".format(tgz_name))
-		except OSError as e:
-			logging.error("Could not delete the local threat collection .tgz file: {}. Details: {}.".format(tgz_path, e.strerror))
 
 	logging.info('ExtraHop Threat Intelligence Toolkit finished running')
 
