@@ -13,9 +13,7 @@ Specify an output directory, threat collection name, ECA/EDA details, and other 
 - [pip](https://pip.pypa.io/en/stable/installing/)
 
 ## Installation
-- pip install cabby==0.1.20
-- pip install stix==1.2.0.6
-- pip install validators==0.12.4
+- pip install -r requirements.txt
 
 ## Example Running Commands
 You will need to update the example output paths, collection names, IP addresses, hostnames, and API keys below to match your environment.
@@ -39,7 +37,7 @@ You will need to update the example output paths, collection names, IP addresses
   - `python3 threat_intelligence_toolkit.py -o ~/output_folder -tc example_collection --taxii-server hailataxii.com /taxii-discovery-service False --basic-user guest --basic-pw guest --days 90 --eda 172.16.1.2 3Hb7EpHRqb2EpnS7iweHgR5F3sf False`
 
 - Generate a STIX file from a flat file, tgz, and upload to an EDA
-  - `python3 threat_intelligence_toolkit.py -o ~/output_folder -tc example_collection --generate-stix --input-file https://gitlab.com/ZeroDot1/CoinBlockerLists/raw/master/MiningServerIPList.txt --list-type ip --eda 172.16.1.2 3Hb7EpHRqb2EpnS7iweHgR5F3sf False`
+  - `python3 threat_intelligence_toolkit.py -o ~/output_folder -tc example_collection --generate-stix --input-file https://gitlab.com/ZeroDot1/CoinBlockerLists/raw/master/list_browser.txt --list-type domain --eda 172.16.1.2 3Hb7EpHRqb2EpnS7iweHgR5F3sf False`
 
 ## Notes
 - One ECA and multiple EDAs can be provided.  If updating more than one ECA is required then the script must be ran multiple times
