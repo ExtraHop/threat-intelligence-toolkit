@@ -34,7 +34,7 @@ You will need to update the example output paths, collection names, IP addresses
   - `python3 threat_intelligence_toolkit.py -o ~/output_folder -tc example_collection --taxii-collections Abuse_ch_Ransomware_IPs_F135 Phish_Tank_F107`
 
 - Download, tgz, and upload all collections from a specific taxii server to an EDA
-  - `python3 threat_intelligence_toolkit.py -o ~/output_folder -tc example_collection --taxii-server hailataxii.com /taxii-discovery-service False --basic-user guest --basic-pw guest --days 90 --eda 172.16.1.2 3Hb7EpHRqb2EpnS7iweHgR5F3sf False`
+  - `python3 threat_intelligence_toolkit.py -o ~/output_folder -tc example_collection --taxii-server hailataxii.com /taxii-discovery-service False --basic-user guest --basic-pw guest --days 1 --eda 172.16.1.2 3Hb7EpHRqb2EpnS7iweHgR5F3sf False`
 
 - Generate a STIX file from a flat file, tgz, and upload to an EDA
   - `python3 threat_intelligence_toolkit.py -o ~/output_folder -tc example_collection --generate-stix --input-file https://gitlab.com/ZeroDot1/CoinBlockerLists/raw/master/list_browser.txt --list-type domain --eda 172.16.1.2 3Hb7EpHRqb2EpnS7iweHgR5F3sf False`
