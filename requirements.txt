@@ -7,7 +7,7 @@ decorator==4.4.2
 furl==2.1.0
 idna==2.10
 libtaxii==1.1.118
-lxml==4.6.2
+lxml==4.6.3
 mixbox==1.0.5
 ordered-set==4.0.2
 orderedmultidict==1.0.1
