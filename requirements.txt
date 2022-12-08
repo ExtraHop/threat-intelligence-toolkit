@@ -1,5 +1,5 @@
 cabby==0.1.23
-certifi==2021.10.8
+certifi==2022.12.7
 charset-normalizer==2.0.7
 colorlog==6.5.0
 cybox==2.1.0.21
