@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# COPYRIGHT 2021 BY EXTRAHOP NETWORKS, INC.
+# COPYRIGHT 2022 BY EXTRAHOP NETWORKS, INC.
 # 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
@@ -12,13 +12,13 @@
 # on your network
 #
 # Usage: Specify an output directory, threat collection name, ECA/EDA details, and other optional config via
-# the command line then the script either generates a STIX file or polls the TAXII server (defaults to anomali 
-# limo intel feed), saves the stix files in a gzipped tar file (tgz), and uploads the threat collection to the
+# the command line then the script either generates a STIX file or polls the TAXII server (defaults to EclecticIQ
+# OpenTAXII intel feed), saves the stix files in a gzipped tar file (tgz), and uploads the threat collection to the
 # specified Reveal(x) ECA/EDAs
 #
 # Note: This script solely serves as example code and is made available without any support or warranty.
 #
-# Version 1.3.5
+# Version 1.3.6
 
 import cabby
 import requests
@@ -246,11 +246,9 @@ def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp
 
 # poll a taxii server for stix files
 def poll_taxii_server(taxii_server, basic_user, basic_pw, taxii_collections, days_to_poll, tmp_dir, verbose):
-	# if no taxii server details are specified then default to the anomali limo threat intel feed
+	# if no taxii server details are specified then default to the EclecticIQ OpenTAXII threat intel feed
 	if not taxii_server:
-		taxii_server = ["limo.anomali.com", "/api/v1/taxii/taxii-discovery-service/", "True"]
-		basic_user = "guest"
-		basic_pw = "guest"
+		taxii_server = ["open.taxiistand.com", "/services/discovery", "True"]
 
 	try:
 		# handle taxii server port if supplied
