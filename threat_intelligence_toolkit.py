@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 #
 # COPYRIGHT 2022 BY EXTRAHOP NETWORKS, INC.
-# 
+#
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
 #
-# Description: Threat Intelligence Toolkit - Automate generating or pulling threat intelligence Structured Threat 
-# Information Expression (STIX) files from a flat file or from a TAXII server and uploading a threat collection to 
-# an ECA and multiple EDAs via the REST API. By uploading STIX files, you can add a threat collection to your ExtraHop 
-# Discover and Command appliances. Threat collections enable you to identify suspicious hosts, IP addresses, and URIs 
+# Description: Threat Intelligence Toolkit - Automate generating or pulling threat intelligence Structured Threat
+# Information Expression (STIX) files from a flat file or from a TAXII server and uploading a threat collection to
+# an ECA and multiple EDAs via the REST API. By uploading STIX files, you can add a threat collection to your ExtraHop
+# Discover and Command appliances. Threat collections enable you to identify suspicious hosts, IP addresses, and URIs
 # on your network
 #
 # Usage: Specify an output directory, threat collection name, ECA/EDA details, and other optional config via
@@ -20,6 +20,8 @@
 #
 # Version 1.3.6
 
+from __future__ import annotations
+from typing import BinaryIO
 import cabby
 import requests
 import urllib3
@@ -41,8 +43,8 @@ from stix.core import STIXPackage, STIXHeader
 from stix.indicator.indicator import Indicator
 
 # parse command line arguments
-def parse_command_line_args():
-	
+def parse_command_line_args() -> argparse.Namespace:
+
 	argparser = argparse.ArgumentParser()
 
 	argparser.add_argument('-o', '--output-dir', action='store', dest='output_dir', help='Existing directory to output tgz containing stix files', required=True, metavar='OUTPUT_DIRECTORY')
@@ -76,15 +78,21 @@ def parse_command_line_args():
 	return args
 
 # strip all non alphanumeric chars from a string
-def strip_non_alphanum(input_str):
+def strip_non_alphanum(input_str: str) -> str:
 	return ''.join(char for char in input_str if char.isalnum())
 
 # convert string to boolean and return True when unsure
-def str_to_bool(input_str):
+def str_to_bool(input_str: str) -> bool:
 	return input_str.lower() not in ['false', 'f', '0', 'n', 'no']
 
 # send a PUT request to an EDA or ECA threatcollections/{id} endpoint
-def threatcollection_api_request(eh_host, eh_apikey, eh_verify_cert, threatcollection_name, file_name, file_path, verbose):
+def threatcollection_api_request(eh_host: str,
+								 eh_apikey: str,
+								 eh_verify_cert: bool,
+								 threatcollection_name: str,
+								 file_name: str,
+								 file_path: str,
+								 verbose: bool) -> None:
 
 	if verbose:
 		logging.info("===============")
@@ -98,7 +106,14 @@ def threatcollection_api_request(eh_host, eh_apikey, eh_verify_cert, threatcolle
 	url = "https://{}/api/v1/threatcollections/~{}".format(eh_host, user_key)
 
 	# configure tgz for multipart file upload
-	file_body = {'file': (file_name, open(file_path, 'rb')), 'name': threatcollection_name} 
+	# file_body = {'file': (file_name, open(file_path, 'rb')), 'name': threatcollection_name}
+	with open(file_path, 'rb') as file_handle:  # type: BinaryIO
+		files = {
+			'file': (file_name, file_handle)
+		}
+		data = {
+			'name': threatcollection_name
+		}
 
 	# log InsecureRequestWarning if making an unverified https request
 	if not eh_verify_cert:
@@ -106,7 +121,8 @@ def threatcollection_api_request(eh_host, eh_apikey, eh_verify_cert, threatcolle
 
 	try:
 		# send PUT request to create or update
-		r = requests.put(url, headers=headers, files=file_body, verify=eh_verify_cert)
+		# r = requests.put(url, headers=headers, files=file_body, verify=eh_verify_cert)
+		r = requests.put(url, headers=headers, files=files, data=data, verify=eh_verify_cert)
 	except Exception as e:
 		logging.error("Issue encountered while sending an API request to {}. Details: {}".format(url, e))
 		raise
@@ -120,7 +136,10 @@ def threatcollection_api_request(eh_host, eh_apikey, eh_verify_cert, threatcolle
 	return
 
 # generate stix files from a flat file or URL to a flat file
-def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp_dir, validate, verbose):
+def generate_stix_file(input_file: str, list_type: str,
+						delimiter: str, list_name: str,
+						tc_name: str, tmp_dir: str,
+						validate: bool, verbose: bool) -> None:
 	# observable limit per generated stix file
 	OBSERVABLES_PER_STIX_FILE = 3000
 
@@ -128,7 +147,7 @@ def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp
 		logging.info("=====================")
 		logging.info("== GENERATING STIX ==")
 		logging.info("=====================")
-	
+
 	# download or open input file
 	if validators.url(input_file):
 		res = requests.get(input_file)
@@ -180,12 +199,12 @@ def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp
 				except ValueError:
 					# if ip address parsing fails then attempt to parse as an ip network
 					try:
-						parsed_ip = ipaddress.ip_network(item, strict=False)
+						parsed_network = ipaddress.ip_network(item, strict=False)
 						indicator_obj.category = Address.CAT_CIDR
+						indicator_obj.address_value = str(parsed_network)
 					except ValueError:
 						logging.warning("IP Address {} is neither an IPv4, IPv6, nor CIDR - skipping".format(item))
 						continue
-				indicator_obj.address_value = str(parsed_ip)
 				indicator_obj.condition = "Equals"
 				indicator_type = "IP Watchlist"
 				# customizable components below
@@ -241,21 +260,24 @@ def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp
 		# clear cybox cache to prevent an Out of Memory error
 		# https://cybox.readthedocs.io/en/stable/api/cybox/core/object.html#cybox.core.object.Object
 		cache_clear()
-			
-	return 
+
+	return
 
 # poll a taxii server for stix files
-def poll_taxii_server(taxii_server, basic_user, basic_pw, taxii_collections, days_to_poll, tmp_dir, verbose):
+def poll_taxii_server(taxii_server: list[str], basic_user: str,
+						basic_pw: str, taxii_collections: str,
+						days_to_poll: int, tmp_dir: str,
+						verbose: bool) -> None:
 	# if no taxii server details are specified then default to the OTX AlienVault/AT&T Cybersecurity threat intel feed
 	if not taxii_server:
 		taxii_server = ["otx.alienvault.com", "/taxii/discovery", "True"]
 
 	try:
 		# handle taxii server port if supplied
-		taxii_server_port = None
+		taxii_server_port: str | None = None
 		if ':' in taxii_server[0]:
 			taxii_server[0], taxii_server_port = taxii_server[0].split(':')
-			
+
 		# setup taxii client
 		taxii_client = cabby.create_client(
 			host=taxii_server[0],
@@ -295,7 +317,7 @@ def poll_taxii_server(taxii_server, basic_user, basic_pw, taxii_collections, day
 		logging.info("== POLLING ==")
 		logging.info("=============")
 
-	# if specified, filter only the supplied collection(s) 
+	# if specified, filter only the supplied collection(s)
 	if taxii_collections:
 		collections = filter(lambda collection: collection.name in taxii_collections, collections)
 
@@ -307,7 +329,7 @@ def poll_taxii_server(taxii_server, basic_user, basic_pw, taxii_collections, day
 			i = 0
 			# save each returned content block in a separate file with the filename ending ..._part_N.stix
 			for i, block in enumerate(content_blocks, 1):
-				collection_filename = "{}_part_{}.stix".format(collection.name, i) 
+				collection_filename = "{}_part_{}.stix".format(collection.name, i)
 				with open(os.path.join(tmp_dir, collection_filename), 'wb') as f:
 					f.write(block.content)
 			if verbose:
@@ -319,10 +341,10 @@ def poll_taxii_server(taxii_server, basic_user, basic_pw, taxii_collections, day
 			if verbose:
 				logging.error("Could not download collection: {}. Details: {}".format(collection.name, e))
 			continue
-	
+
 	return
 
-def main():
+def main() -> None:
 	# retrive command line arguments
 	args = parse_command_line_args()
 
