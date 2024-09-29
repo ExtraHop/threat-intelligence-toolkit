@@ -246,9 +246,9 @@ def generate_stix_file(input_file, list_type, delimiter, list_name, tc_name, tmp
 
 # poll a taxii server for stix files
 def poll_taxii_server(taxii_server, basic_user, basic_pw, taxii_collections, days_to_poll, tmp_dir, verbose):
-	# if no taxii server details are specified then default to the EclecticIQ OpenTAXII threat intel feed
+	# if no taxii server details are specified then default to the OTX AlienVault/AT&T Cybersecurity threat intel feed
 	if not taxii_server:
-		taxii_server = ["open.taxiistand.com", "/services/discovery", "True"]
+		taxii_server = ["otx.alienvault.com", "/taxii/discovery", "True"]
 
 	try:
 		# handle taxii server port if supplied
