@@ -1,0 +1,33 @@
+name: build
+
+on: ["push", "pull_request"]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -r requirements.txt
+        python -m pip install flake8==7.1.1 mypy==1.11.2 pytest==8.3.3 pytest-cov==5.0.0
+        python -m mypy --install-types
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings.
+        flake8 . --count --exit-zero --ignore=W191,E501 --max-complexity=25 --statistics
+    - name: Static type checking with mypy
+      run: |
+        python -m mypy --strict .
+    - name: Pytest
+      run: |
+        pytest
