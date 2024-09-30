@@ -1,32 +1,52 @@
 name: build
 
-on: ["push", "pull_request"]
+on: [push, pull_request]
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.9", "3.12"]
 
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Python 3.11
+
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
-        python-version: "3.11"
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         python -m pip install -r requirements.txt
         python -m pip install flake8==7.1.1 mypy==1.11.2 mypy-extensions types-pytz types-requests pytest==8.3.3 pytest-cov==5.0.0
+
     - name: Lint with flake8
       run: |
-        # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings.
         flake8 . --count --exit-zero --ignore=W191,E501 --max-complexity=25 --statistics
+
     - name: Static type checking with mypy
       run: |
         python -m mypy --strict .
-    - name: Pytest
+
+    - name: Run Pytest
       run: |
         pytest
+
+    - name: Run tool with --help
+      run: |
+        python threat_intelligence_toolkit.py --help
