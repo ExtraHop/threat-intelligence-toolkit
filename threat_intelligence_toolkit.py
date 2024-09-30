@@ -189,6 +189,7 @@ def generate_stix_file(input_file: str, list_type: str, delimiter: str, list_nam
 					else:
 						logging.warning(f"Unknown IP Address version type: {parsed_ip.version} - skipping")
 						continue
+					indicator_obj.address_value = str(parsed_ip)
 				except ValueError:
 					# if ip address parsing fails then attempt to parse as an ip network
 					try:
