@@ -10,7 +10,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.9", "3.11"]
+        python-version: ["3.11"]
+        include:
+        - os: ubuntu-latest
+          path: ~/.cache/pip
+        - os: macos-latest
+          path: ~/Library/Caches/pip
+        - os: windows-latest
+          path: ~\AppData\Local\pip\Cache
 
     steps:
     - uses: actions/checkout@v4
@@ -23,7 +30,7 @@ jobs:
     - name: Cache pip
       uses: actions/cache@v4
       with:
-        path: ~/.cache/pip
+        path: ${{ matrix.path }}
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
