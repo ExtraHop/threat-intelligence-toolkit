@@ -1,3 +1,6 @@
+# ⚠️ DEPRECATED
+As of the 26.2 firmware release, the Threat Intelligence Toolkit is officially **deprecated** since STIX 1.0 file uploads are no longer supported. See https://docs.extrahop.com/current/threat-upload/ for more information.
+
 # Threat Intelligence Toolkit
 
 ## Description
